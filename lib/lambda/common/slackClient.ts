@@ -10,7 +10,7 @@ export const getSlackClient = async () => {
       SecretId: process.env.SLACK_SECRET,
     })
   );
-  const slackToken = JSON.parse(secret.SecretString || "").SLACK_TOKEN;
+  const slackToken = JSON.parse(secret.SecretString || "{}").SLACK_TOKEN;
   const slackClient = new WebClient(slackToken);
   return slackClient;
 };

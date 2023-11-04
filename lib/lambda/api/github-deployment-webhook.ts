@@ -1,22 +1,15 @@
 import { APIGatewayEvent } from "aws-lambda";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { nextEnvs } from "../common/nextEnvs";
-import { GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { EventDetailTypes } from "../common/event-detail-types";
 import { putEvent } from "../common/put-events";
 import { deploymentMessage } from "../common/deployment-message";
 import { ddbDocClient } from "../common/dynamodb";
 import { eb } from "../common/eventbridge";
-import { sm } from "../common/secretsmanager";
 
 export const handler = async (event: APIGatewayEvent) => {
   const body = JSON.parse(event.body || "{}");
   console.log(JSON.stringify({ body }, null, 2));
-  if (!Object.keys(body).includes("deployment_status")) {
-    return {
-      statusCode: 200,
-    };
-  }
   if (body.sender.type !== "User") {
     // there are also "Bot" sender types which ends up leading to duplicate events
     return {
@@ -39,16 +32,10 @@ export const handler = async (event: APIGatewayEvent) => {
   const repo = body.repository.name;
   const author = body.deployment_status.creator.login;
   const owner = body.repository.owner.login;
-
-  const secret = await sm.send(
-    new GetSecretValueCommand({
-      SecretId: process.env.GITHUB_SECRET,
-    })
-  );
-  const githubToken = JSON.parse(secret.SecretString || "").GITHUB_TOKEN;
-
   const pk = `REPO#${repo}#ENV#${env}`.toUpperCase();
   const sk = "LATEST";
+
+  console.log(pk);
 
   // get deployment status from dynamodb
   const ddbRes = await ddbDocClient.send(
@@ -93,20 +80,6 @@ export const handler = async (event: APIGatewayEvent) => {
         detailType: EventDetailTypes.SLACK_CHAT,
         eb,
       });
-    }
-    if (existingItem.tag) {
-      const createTagRef = await fetch(
-        `https://api.github.com/repos/${existingItem.owner}/${repo}/git/${existingItem.tag}`,
-        {
-          method: "DELETE",
-          headers: {
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            Authorization: `Bearer ${githubToken}`,
-          },
-        }
-      );
-      await createTagRef.json();
     }
     // save old version to history
     await ddbDocClient.send(

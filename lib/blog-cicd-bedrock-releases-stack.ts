@@ -55,6 +55,8 @@ export class BlogCicdBedrockReleasesStack extends Stack {
     new NestedEventStack(this, "NestedEventStack", {
       bus,
       events: events({ table, slackSecret, githubSecret }),
+      nextEnvs,
+      oidcs,
     });
   }
 }

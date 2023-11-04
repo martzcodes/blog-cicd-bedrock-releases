@@ -31,9 +31,6 @@ export const webhooks = ({
     dynamoRead: {
       BOT_TABLE: table,
     },
-    secretRead: {
-      GITHUB_SECRET: githubSecret,
-    },
   },
   {
     path: "slack/action",
@@ -51,9 +48,6 @@ export const webhooks = ({
     },
     dynamoRead: {
       BOT_TABLE: table,
-    },
-    secretRead: {
-      SLACK_SECRET: slackSecret,
     },
   },
 ];

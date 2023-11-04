@@ -1,7 +1,6 @@
 import { APIGatewayEvent } from "aws-lambda";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { nextEnvs } from "../common/nextEnvs";
-import { getSlackClient } from "../common/slackClient";
 import { EventDetailTypes } from "../common/event-detail-types";
 import { putEvent } from "../common/put-events";
 import { ddbDocClient } from "../common/dynamodb";
@@ -19,31 +18,8 @@ export const handler = async (event: APIGatewayEvent) => {
     .split("+deployment+to+")[1]
     .split("+by+")[0];
   const authority = jsonObject.user.name;
-  const slackClient = await getSlackClient();
-
-  const slackAuthority = await slackClient.users.profile.get({
-    user: jsonObject.user.id,
-  });
-  const userImg = slackAuthority.profile?.image_24;
   message.blocks = message.blocks.filter((msg: any) => msg.type !== "actions");
   message.blocks[0].text.text = message.blocks[0].text.text.replace(/\+/g, " ");
-  const contextBlock = {
-    type: "context",
-    elements: [
-      {
-        type: "image",
-        image_url: userImg,
-        alt_text: authority,
-      },
-      {
-        type: "mrkdwn",
-        text: `thinks we should *${
-          approved ? "approve" : "reject"
-        }* this deployment`,
-      },
-    ],
-  };
-  message.blocks.push(contextBlock);
 
   const pk = `REPO#${repo}#ENV#${env}`.toUpperCase();
   const sk = "LATEST";

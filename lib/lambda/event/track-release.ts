@@ -35,10 +35,10 @@ const archiveLatestRelease = async ({
     })
   );
   const releaseItem = (release.Item || { commits: [] }) as Release;
-  releaseItem.releasedOn = new Date().toISOString();
-  releaseItem.sk = new Date().toISOString();
   // re-save latest as releasedOn
   if (release.Item) {
+    releaseItem.releasedOn = new Date().toISOString();
+    releaseItem.sk = new Date().toISOString();
     await ddbDocClient.send(
       new PutCommand({
         TableName: process.env.BOT_TABLE,
@@ -93,7 +93,7 @@ const queryCommitsAfterDate = async ({
   // query the commits after the last release
   const params: QueryCommandInput = {
     TableName: process.env.BOT_TABLE,
-    KeyConditionExpression: `#pk = :pk and #sk >= :sk and #sk_start <= #sk_end`,
+    KeyConditionExpression: `#pk = :pk and #sk between :sk_start and :sk_end`,
     ExpressionAttributeNames: {
       "#pk": "pk",
       "#sk": "sk",
@@ -101,7 +101,7 @@ const queryCommitsAfterDate = async ({
     ExpressionAttributeValues: {
       ":pk": pk,
       ":sk_start": archivedRelease.sk,
-      ":sk_end": deployment.deployedAt,
+      ":sk_end": deployment.deployedOn,
     },
   };
 
@@ -125,22 +125,22 @@ const queryCommitsAfterDate = async ({
   return commits;
 };
 
-export const handler = async (event: EventBridgeEvent<string, DeploymentEvent>) => {
+export const handler = async (event: EventBridgeEvent<string, { data: DeploymentEvent }>) => {
   console.log(JSON.stringify({ event }, null, 2));
 
   // store the deployment event in dynamodb
-  const deployment = event.detail;
+  const deployment = event.detail.data;
   const archivedRelease = await archiveLatestRelease({
     ddbDocClient,
     deployment,
   });
   console.log(JSON.stringify({ archivedRelease }, null, 2));
   if (deployment.env === "test" || deployment.env === "prod") {
-    const commits = await queryCommitsAfterDate({
+    const commits = archivedRelease.sk && deployment.deployedOn ? await queryCommitsAfterDate({
       ddbDocClient,
       archivedRelease: archivedRelease,
       deployment,
-    });
+    }) : [];
     console.log(JSON.stringify({ commits }, null, 2));
     await createLatestRelease({
       ddbDocClient,

@@ -13,6 +13,8 @@ import { EventSources } from "./lambda/common/event-sources";
 export interface NestedEventStackProps extends NestedStackProps {
   bus: IEventBus;
   events: EventBridgeEvent[];
+  oidcs: Record<string, string>;
+  nextEnvs: Record<string, string>;
 }
 
 export class NestedEventStack extends NestedStack {
@@ -21,10 +23,12 @@ export class NestedEventStack extends NestedStack {
   constructor(scope: Construct, id: string, props: NestedEventStackProps) {
     super(scope, id, props);
 
-    const { bus, events } = props;
+    const { bus, events, nextEnvs, oidcs } = props;
 
     events.forEach((ev) => {
       const fn = this.createEventBridgeFn({ bus, event: ev });
+      fn.addEnvironment("OIDCS", JSON.stringify(oidcs));
+      fn.addEnvironment("NEXT_ENVS", JSON.stringify(nextEnvs));
       new Rule(this, `${ev.lambda}Rule`, {
         eventPattern: ev.eventPattern,
         targets: [new LambdaFunction(fn)],
