@@ -1,0 +1,60 @@
+name: deploy-to-env
+on: 
+  workflow_call:
+    inputs:
+      deploy_env:
+        required: true
+        type: string
+      oidc_role:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+      oidc_role:
+        description: 'OIDC Role to assume for deployment'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    environment: ${{ inputs.deploy_env }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+      id-token: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ inputs.oidc_role }}
+          aws-region: us-east-1
+      - name: install deps
+        run: npm i --quiet
+      - name: start deployment
+        uses: bobheadxi/deployments@v1.2.0
+        id: deployment
+        with:
+          step: start
+          env: ${{ inputs.deploy_env }}
+      - name: ${{ inputs.deploy_env }} deploy
+        env:
+          DEPLOY_ENV: ${{ inputs.deploy_env }}
+        run: npx cdk deploy --ci --require-approval never --concurrency 5 -v
+      - name: update deployment status
+        uses: bobheadxi/deployments@v1.2.0
+        with:
+          step: finish
+          status: ${{ job.status }}
+          env: ${{ inputs.deploy_env }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}

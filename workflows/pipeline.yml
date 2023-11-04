@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+#########################################################
+# Concurrency allows running 1 job or workflow at a time
+#
+# If 1st is running and 2nd is triggered,
+#   - 1st (which was running) will continue running
+#   - 2nd (latest) will go to pending state
+#
+# If 1st running, 2nd in pending and 3rd is triggered,
+#   - 1st (which was running) will continue running
+#   - 2nd (which was pending) will be cancelled
+#   - 3rd (latest) will go to pending state
+#########################################################
+concurrency:
+  group: deploy
+
+jobs:
+  # test:
+  #   name: test
+  #   uses: aws-community-projects/cicd/.github/workflows/test.yml@main
+  deploy-dev:
+    name: deploy to dev
+    # needs: test
+    uses: aws-community-projects/cicd/.github/workflows/deploy-to-env.yml@main
+    with:
+      deploy_env: dev
+      oidc_role: arn:aws:iam::123456789012:role/GitHubOidcRole
