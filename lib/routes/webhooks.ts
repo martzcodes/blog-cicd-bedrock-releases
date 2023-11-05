@@ -19,6 +19,10 @@ export const webhooks = ({
     dynamoWrite: {
       BOT_TABLE: table,
     },
+    bedrock: true,
+    secretRead: {
+      GITHUB_SECRET: githubSecret,
+    }
   },
   {
     path: "github/deployment",

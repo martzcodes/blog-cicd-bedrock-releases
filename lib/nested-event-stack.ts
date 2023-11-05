@@ -52,24 +52,34 @@ export class NestedEventStack extends NestedStack {
       environment: {
         EVENT_SOURCE: EventSources.DeployerBot,
       },
+      bundling: {
+        // Nodejs function excludes aws-sdk v3 by default because it is included in the lambda runtime
+        // but bedrock is not built into the lambda runtime so we need to override the @aws-sdk/* exclusions
+        externalModules: [
+          "@aws-sdk/client-dynamodb",
+          "@aws-sdk/client-eventbridge",
+          "@aws-sdk/client-secrets-manager",
+          "@aws-sdk/lib-dynamodb",
+        ],
+      },
       retryAttempts: 0,
     });
     if (event.dynamosToRead) {
       Object.entries(event.dynamosToRead).forEach(([key, value]) => {
         fn.addEnvironment(key, value.tableName);
-        value.grantReadData(fn)
+        value.grantReadData(fn);
       });
     }
     if (event.dynamosToWrite) {
       Object.entries(event.dynamosToWrite).forEach(([key, value]) => {
         fn.addEnvironment(key, value.tableName);
-        value.grantWriteData(fn)
+        value.grantWriteData(fn);
       });
     }
     if (event.secretsToRead) {
       Object.entries(event.secretsToRead).forEach(([key, value]) => {
         fn.addEnvironment(key, value.secretName);
-        value.grantRead(fn)
+        value.grantRead(fn);
       });
     }
     if (event.putEvents) {

@@ -11,7 +11,7 @@ import { Construct } from "constructs";
 import { join } from "path";
 import { Endpoint } from "../interfaces/Endpoint";
 import { IEventBus } from "aws-cdk-lib/aws-events";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { EventSources } from "../lambda/common/event-sources";
 
@@ -90,6 +90,25 @@ export class Api extends Construct {
         EVENT_SOURCE: EventSources.DeployerBot,
         SLACK_CHANNEL: "C064YNZN940", // TODO: this should be from a property
       },
+      bundling: {
+        // Nodejs function excludes aws-sdk v3 by default because it is included in the lambda runtime
+        // but bedrock is not built into the lambda runtime so we need to override the @aws-sdk/* exclusions
+        externalModules: [
+          "@aws-sdk/client-dynamodb",
+          "@aws-sdk/client-eventbridge",
+          "@aws-sdk/client-secrets-manager",
+          "@aws-sdk/lib-dynamodb",
+        ],
+      },
+      ...(endpoint.bedrock && {
+        initialPolicy: [
+          new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: ['bedrock:InvokeModel'],
+            resources: ['*']
+          })
+        ]
+      }),
       retryAttempts: 0,
     });
     if (endpoint.putEvents) {
