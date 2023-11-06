@@ -50,25 +50,10 @@ export const handler = async (event: APIGatewayEvent) => {
   let existingItem = ddbRes.Item;
   console.log(JSON.stringify({ existingItem }, null, 2));
   if (existingItem && existingItem?.deploymentId !== deploymentId) {
-    // update last slack message to remove approve/reject buttons
-    const oldBlocks = JSON.parse(existingItem.blocks);
-    const approveBlock = oldBlocks.findIndex(
-      (block: any) =>
-        Object.keys(block).includes("accessory") &&
-        block.accessory.value === "approved"
-    );
-    // remove items from oldBlocks after approveBlock
-    oldBlocks.splice(approveBlock, oldBlocks.length - approveBlock);
-    oldBlocks.push({
-      type: "context",
-      elements: [
-        {
-          type: "mrkdwn",
-          text: `Automatic rejection by subsequent deployment`,
-        },
-      ],
-    });
     if (existingItem.slackTs) {
+      // update last slack message to remove approve/reject buttons
+      const oldBlocks = JSON.parse(existingItem.blocks).filter((block: any) => block.type !== "divider" && block.type !== "actions");
+      console.log(JSON.stringify({ oldBlocks }, null, 2));
       await putEvent({
         detail: JSON.stringify({
           message: {
@@ -80,19 +65,19 @@ export const handler = async (event: APIGatewayEvent) => {
         detailType: EventDetailTypes.SLACK_CHAT,
         eb,
       });
+      // save old version to history
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: process.env.BOT_TABLE,
+          Item: {
+            ...existingItem,
+            sk: `DEPLOYMENT#${existingItem.deploymentId}`.toUpperCase(),
+            blocks: JSON.stringify(oldBlocks),
+            ttl: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 60, // 60 days
+          },
+        })
+      );
     }
-    // save old version to history
-    await ddbDocClient.send(
-      new PutCommand({
-        TableName: process.env.BOT_TABLE,
-        Item: {
-          ...existingItem,
-          sk: `DEPLOYMENT#${existingItem.deploymentId}`.toUpperCase(),
-          blocks: JSON.stringify(oldBlocks),
-          ttl: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 60, // 60 days
-        },
-      })
-    );
     existingItem = {};
   }
   if (existingItem?.status === status) {
@@ -126,6 +111,7 @@ export const handler = async (event: APIGatewayEvent) => {
   const slackChannel = process.env.SLACK_CHANNEL;
 
   const item = {
+    ...existingItem,
     pk,
     sk,
     author,

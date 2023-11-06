@@ -91,7 +91,6 @@ const createLatestRelease = async ({
 const queryCommitsBetweenCommits = async ({
   ddbDocClient,
   repo,
-  deployment,
   startingCommitSha,
   endingCommitSha,
 }: {
@@ -99,32 +98,48 @@ const queryCommitsBetweenCommits = async ({
   repo: string;
   startingCommitSha: string;
   endingCommitSha: string;
-  deployment: DeploymentEvent;
 }): Promise<GitHubCommit[]> => {
-  const startingCommit = await ddbDocClient.send(
-    new GetCommand({
-      TableName: process.env.BOT_TABLE,
-      Key: {
-        pk: `COMMITREF#${repo}`.toUpperCase(),
-        sk: startingCommitSha,
-      },
-    })
-  );
+  const startingCommit = startingCommitSha
+    ? await ddbDocClient.send(
+        new GetCommand({
+          TableName: process.env.BOT_TABLE,
+          Key: {
+            pk: `COMMITREF#${repo}`.toUpperCase(),
+            sk: startingCommitSha,
+          },
+        })
+      )
+    : ({} as any);
+  const endingCommit = endingCommitSha
+    ? await ddbDocClient.send(
+        new GetCommand({
+          TableName: process.env.BOT_TABLE,
+          Key: {
+            pk: `COMMITREF#${repo}`.toUpperCase(),
+            sk: endingCommitSha,
+          },
+        })
+      )
+    : ({} as any);
+  console.log(JSON.stringify({ startingCommit, endingCommit }, null, 2));
   if (!startingCommit.Item) {
-    return [];
+    if (!endingCommit.Item) {
+      return [];
+    }
+    const actualEndingCommit = await ddbDocClient.send(
+      new GetCommand({
+        TableName: process.env.BOT_TABLE,
+        Key: {
+          pk: `COMMIT#${repo}`.toUpperCase(),
+          sk: endingCommit.Item.commitedDate,
+        },
+      })
+    );
+    return [actualEndingCommit.Item as GitHubCommit];
   }
-  const endingCommit = await ddbDocClient.send(
-    new GetCommand({
-      TableName: process.env.BOT_TABLE,
-      Key: {
-        pk: `COMMITREF#${repo}`.toUpperCase(),
-        sk: endingCommitSha,
-      },
-    })
-  );
-  if (!endingCommit.Item) {
-    return [];
-  }
+  const start = startingCommit.Item.commitedDate;
+  const end = endingCommit.Item?.commitedDate || new Date().toISOString();
+  console.log(JSON.stringify({ startingCommit, endingCommit }, null, 2));
 
   const pk = `COMMIT#${repo}`.toUpperCase();
   // query the commits after the last release
@@ -137,8 +152,8 @@ const queryCommitsBetweenCommits = async ({
     },
     ExpressionAttributeValues: {
       ":pk": pk,
-      ":sk_start": startingCommit.Item.commitedDate,
-      ":sk_end": endingCommit.Item.commitedDate,
+      ":sk_start": start,
+      ":sk_end": end,
     },
   };
 
@@ -159,7 +174,7 @@ const queryCommitsBetweenCommits = async ({
     console.error(e);
     throw e;
   }
-  return commits;
+  return commits.filter((commit) => commit.sha !== startingCommitSha);
 };
 
 export const handler = async (
@@ -188,49 +203,47 @@ export const handler = async (
     deployment,
   });
   console.log(JSON.stringify({ archivedRelease }, null, 2));
-  if (deployment.env === "test" || deployment.env === "prod") {
-    const commits =
-      archivedRelease.sk && deployment.deployedOn
-        ? await queryCommitsBetweenCommits({
-            ddbDocClient,
-            repo: archivedRelease.repo,
-            startingCommitSha: archivedRelease.sha,
-            endingCommitSha: deployment.sha,
-            deployment,
-          })
-        : [];
-    const toSummarize = {
-      lastRelease: archivedRelease.releasedOn,
-      releasedOn,
-      commits,
-      repo: deployment.repo,
-      env: deployment.env,
-    };
-    console.log(JSON.stringify(toSummarize, null, 2));
-    const summary = await summarizeRelease(JSON.stringify(toSummarize));
-    const summaryBlock = {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*${deployment.env.toUpperCase()} Release Summary*\n${summary}`,
-      },
-    };
-    // add the summary block below the divider
-    const dividerIndex = blocks.findIndex(
-      (block: any) => block.type === "divider"
-    );
+  const commits = await queryCommitsBetweenCommits({
+    ddbDocClient,
+    repo: deployment.repo,
+    startingCommitSha: archivedRelease.sha,
+    endingCommitSha: deployment.sha,
+  });
+  console.log(JSON.stringify({ commits }, null, 2));
+  const toSummarize = {
+    lastRelease: archivedRelease.releasedOn,
+    releasedOn,
+    commits,
+    repo: deployment.repo,
+    env: deployment.env,
+  };
+  console.log(JSON.stringify(toSummarize, null, 2));
+  const summary =
+    commits.length && (await summarizeRelease(JSON.stringify(toSummarize)));
+  const summaryBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*${deployment.env.toUpperCase()} Release Summary*\n${summary}`,
+    },
+  };
+  // add the summary block below the divider
+  const dividerIndex = blocks.findIndex(
+    (block: any) => block.type === "divider"
+  );
+  if (summary) {
     blocks.splice(dividerIndex + 1, 0, summaryBlock);
-    console.log(JSON.stringify({ summary }, null, 2));
-    await createLatestRelease({
-      ddbDocClient,
-      deployment,
-      commits,
-      summary,
-      releasedOn,
-      sha: deployment.sha,
-    });
   }
-  if (deployment.env === "dev" || deployment.env === "test") {
+  console.log(JSON.stringify({ summary }, null, 2));
+  await createLatestRelease({
+    ddbDocClient,
+    deployment,
+    commits,
+    summary: summary || "",
+    releasedOn,
+    sha: deployment.sha,
+  });
+  if (deployment.env !== "prod") {
     // get the latest for the nextEnv
     const nextEnv = nextEnvs[deployment.env];
     const pk = `RELEASE#${deployment.repo}#${nextEnv}`.toUpperCase();
@@ -251,7 +264,6 @@ export const handler = async (
         repo: archivedRelease.repo,
         startingCommitSha: releaseToPrep.Item.sha,
         endingCommitSha: deployment.sha,
-        deployment,
       });
       console.log(JSON.stringify({ releaseToPrepCommits }, null, 2));
       const prep = await prepRelease({
@@ -269,15 +281,18 @@ export const handler = async (
           type: "mrkdwn",
           text: `*Prep for ${nextEnv.toUpperCase()}*\n${prep}`,
         },
-      }
+      };
       // add the prep block below the summary block (or the divider if no summary)
       const dividerIndex = blocks.findIndex(
         (block: any) => block.type === "divider"
       );
       const summaryIndex = blocks.findIndex(
-        (block: any) => block.type === "section" && block.text?.text?.startsWith(summaryHeader)
+        (block: any) =>
+          block.type === "section" &&
+          block.text?.text?.startsWith(summaryHeader)
       );
-      const insertIndex = summaryIndex > -1 ? summaryIndex + 1 : dividerIndex + 1;
+      const insertIndex =
+        summaryIndex > -1 ? summaryIndex + 1 : dividerIndex + 1;
       blocks.splice(insertIndex, 0, prepBlock);
     }
   }

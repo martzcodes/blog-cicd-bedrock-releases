@@ -8,12 +8,12 @@ const client = new BedrockRuntimeClient({
   region: "us-east-1",
 });
 
-export const summarizeCommit = async (commit: string) => {
-  const prompt = `Human: You are a code reviewer bot that summarizes commit messages.
+export const summarizeCommit = async (commit: string): Promise<string> => {
+  const prompt = `Human: You are a code reviewer bot that summarizes code commits.
 Provide a 1-2 sentence summary of the commit that would be useful for developers and product managers.
-APIs must be backwards compatible which includes path changes, if they are not make a note of it.
-If you think there are bugs or risky/breaking changes make a note of it.
-Only respond with the summary.
+APIs must be backwards compatible which includes path changes, if they are not it should be highlighted in the summary.
+In your summary include analysis of the commit below for bugs and risky or breaking changes.
+Your response should only be the summary with no lead-in.
 <commit>
 ${commit}
 </commit>
@@ -42,13 +42,13 @@ Assistant:`;
   return JSON.parse(responseBody).completion;
 };
 
-export const summarizeRelease = async (release: string) => {
-  const prompt = `Human: You are code release bot that summarizes what's in a release.
-Provide a 1-4 sentence summary of the commits contained in a release that would be useful for developers and product managers.
+export const summarizeRelease = async (release: string): Promise<string> => {
+  const prompt = `Human: You are a code release bot that creates release summaries.
+You will create a 1-4 sentence summary of the release below that would be useful for developers and product managers.
 Accelerate Metrics, Contributors and Release Cadence are of interest in the summary.
-APIs must be backwards compatible which includes path changes, if they are not make a note of it.
-If you think there are bugs or risky/breaking changes make a note of it.
-Only respond with the summary.
+APIs must be backwards compatible which includes path changes, if they are not it should be highlighted in the summary.
+If you think there are bugs or risky/breaking changes make a note of it in the summary.
+Your response should only be the summary with no lead-in.
 <release>
 ${release}
 </release>
@@ -85,10 +85,10 @@ export const prepRelease = async ({
   commits: string;
   lowerEnv: string;
   higherEnv: string;
-}) => {
+}): Promise<string> => {
   const prompt = `Human: You are code release bot that summarizes what could be in a release.
-Provide a 1-4 sentence summary of the differences between the lower environment (${lowerEnv}) and the higher environment (${higherEnv}) that would be useful for developers and product managers.
-APIs must be backwards compatible which includes path changes, if they are not make a note of it.
+You will provide a 1-4 sentence summary of the differences between the lower environment (${lowerEnv}) and the higher environment (${higherEnv}) that would be useful for developers and product managers.
+APIs must be backwards compatible which includes path changes, if they are not it should be highlighted in the summary.
 If you think there are bugs or risky/breaking changes make a note of it.
 You are being provided with the commits different between the environments.
 Make a recommendation for whether to promote or not.
