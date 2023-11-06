@@ -29,6 +29,7 @@ export const events = ({
     putEvents: true,
     dynamosToRead: { BOT_TABLE: table },
     dynamosToWrite: { BOT_TABLE: table },
+    bedrock: true,
   },
   {
     lambda: "event/deploy-with-github",

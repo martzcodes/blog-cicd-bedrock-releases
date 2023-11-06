@@ -9,6 +9,7 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { EventSources } from "./lambda/common/event-sources";
+import { PolicyStatement, Effect } from "aws-cdk-lib/aws-iam";
 
 export interface NestedEventStackProps extends NestedStackProps {
   bus: IEventBus;
@@ -51,6 +52,7 @@ export class NestedEventStack extends NestedStack {
       memorySize: 1024,
       environment: {
         EVENT_SOURCE: EventSources.DeployerBot,
+        SLACK_CHANNEL: "C064YNZN940", // TODO: this should be from a property
       },
       bundling: {
         // Nodejs function excludes aws-sdk v3 by default because it is included in the lambda runtime
@@ -62,6 +64,15 @@ export class NestedEventStack extends NestedStack {
           "@aws-sdk/lib-dynamodb",
         ],
       },
+      ...(event.bedrock && {
+        initialPolicy: [
+          new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: ['bedrock:InvokeModel'],
+            resources: ['*']
+          })
+        ]
+      }),
       retryAttempts: 0,
     });
     if (event.dynamosToRead) {

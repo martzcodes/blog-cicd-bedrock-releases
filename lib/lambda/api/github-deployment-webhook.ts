@@ -143,6 +143,7 @@ export const handler = async (event: APIGatewayEvent) => {
     blocks: JSON.stringify(message.blocks),
     ttl: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 60, // 30 days
   };
+  console.log(JSON.stringify({ item }, null, 2));
   await ddbDocClient.send(
     new PutCommand({ TableName: process.env.BOT_TABLE, Item: item })
   );

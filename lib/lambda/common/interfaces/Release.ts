@@ -8,4 +8,5 @@ export interface Release {
     message: string;
   }[];
   releasedOn: string;
+  sha: string;
 }

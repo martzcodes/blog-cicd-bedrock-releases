@@ -22,6 +22,7 @@ export const handler = async (event: APIGatewayEvent) => {
   message.blocks[0].text.text = message.blocks[0].text.text.replace(/\+/g, " ");
 
   const pk = `REPO#${repo}#ENV#${env}`.toUpperCase();
+  console.log(pk);
   const sk = "LATEST";
 
   // get deployment status from dynamodb
@@ -34,12 +35,8 @@ export const handler = async (event: APIGatewayEvent) => {
       },
     })
   );
-  const existingItem = ddbRes.Item;
-  if (!existingItem) {
-    return {
-      statusCode: 404,
-    };
-  }
+  const existingItem = ddbRes.Item || {};
+  console.log(JSON.stringify({existingItem}));
   if (
     Object.keys(existingItem).includes("approved") &&
     Object.keys(existingItem).includes("rejected")
