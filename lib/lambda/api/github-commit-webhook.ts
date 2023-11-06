@@ -24,7 +24,7 @@ export const handler = async (event: APIGatewayEvent) => {
         })
       );
       const githubToken = JSON.parse(secret.SecretString || "{}").GITHUB_TOKEN;
-      const githubRepo = body.repository.full_name.split('/')[1];
+      const githubRepo = body.repository.full_name.split("/")[1];
       for (let j = 0; j < body.commits.length; j++) {
         await ddbDocClient.send(
           new PutCommand({
@@ -57,14 +57,16 @@ export const handler = async (event: APIGatewayEvent) => {
           author: detailedCommit.commit.author.name,
           url: detailedCommit.commit.url,
           stats: detailedCommit.stats,
-          files: detailedCommit.files.map((file: any) => ({
-            filename: file.filename,
-            status: file.status,
-            additions: file.additions,
-            deletions: file.deletions,
-            changes: file.changes,
-            patch: file.patch,
-          }))
+          files: detailedCommit.files
+            .filter((file: any) => !file.filename.includes("package-lock.json"))
+            .map((file: any) => ({
+              filename: file.filename,
+              status: file.status,
+              additions: file.additions,
+              deletions: file.deletions,
+              changes: file.changes,
+              patch: file.patch,
+            })),
         };
         const summary = await summarizeCommit(JSON.stringify(simplifiedCommit));
         console.log(JSON.stringify({ summary }));
