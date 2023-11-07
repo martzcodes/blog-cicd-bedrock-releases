@@ -14,8 +14,9 @@ const nextEnvs: Record<string, string> = {
 
 const app = new cdk.App();
 new BlogCicdBedrockReleasesStack(app, "BlogCicdBedrockReleasesStack", {
+  githubSecretArn: "arn:aws:secretsmanager:us-east-1:359317520455:secret:deployerbot/github-LM5TP2",
   nextEnvs,
   oidcs,
-  githubSecretArn: "arn:aws:secretsmanager:us-east-1:359317520455:secret:deployerbot/github-LM5TP2",
+  slackChannel: "C064YNZN940",
   slackSecretArn: "arn:aws:secretsmanager:us-east-1:359317520455:secret:deployerbot/slack-bbPlpP",
 });

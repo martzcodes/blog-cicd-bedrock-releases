@@ -9,18 +9,24 @@ import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 import { join } from "path";
-import { Endpoint } from "../interfaces/Endpoint";
+import { EndpointLambda } from "../interfaces/EndpointLambda";
 import { IEventBus } from "aws-cdk-lib/aws-events";
-import { Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import {
+  Effect,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { EventSources } from "../lambda/common/event-sources";
 
 export interface ApiProps {
   bus: IEventBus;
-  endpoints: Endpoint[];
+  endpoints: EndpointLambda[];
   name: string;
   nextEnvs: Record<string, string>;
   oidcs: Record<string, string>;
+  slackChannel: string;
 }
 
 export class Api extends Construct {
@@ -30,7 +36,7 @@ export class Api extends Construct {
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
 
-    const { bus, name, nextEnvs, oidcs } = props;
+    const { bus, name, nextEnvs, oidcs, slackChannel } = props;
 
     this.restApi = new RestApi(this, `${name}Api`, {
       description: `API for ${name}`,
@@ -46,7 +52,7 @@ export class Api extends Construct {
     props.endpoints.forEach((endpoint) => {
       this.createEndpointPath({ path: endpoint.path });
       const resource = this.resources[endpoint.path];
-      this.createEndpointFn({ bus, endpoint });
+      this.createEndpointFn({ bus, endpoint, slackChannel });
       const fn = this.fns[endpoint.lambda];
       fn.addEnvironment("OIDCS", JSON.stringify(oidcs));
       fn.addEnvironment("NEXT_ENVS", JSON.stringify(nextEnvs));
@@ -78,7 +84,15 @@ export class Api extends Construct {
     });
   }
 
-  createEndpointFn({ bus, endpoint }: { bus: IEventBus; endpoint: Endpoint }) {
+  createEndpointFn({
+    bus,
+    endpoint,
+    slackChannel,
+  }: {
+    bus: IEventBus;
+    endpoint: EndpointLambda;
+    slackChannel: string;
+  }) {
     const fn = new NodejsFunction(this, `${endpoint.lambda}Fn`, {
       entry: join(__dirname, `../lambda/api/${endpoint.lambda}.ts`),
       runtime: Runtime.NODEJS_18_X,
@@ -88,7 +102,7 @@ export class Api extends Construct {
       description: `${endpoint.lambda}Fn - ${this.restApi.restApiName}`,
       environment: {
         EVENT_SOURCE: EventSources.DeployerBot,
-        SLACK_CHANNEL: "C064YNZN940", // TODO: this should be from a property
+        SLACK_CHANNEL: slackChannel,
       },
       bundling: {
         // Nodejs function excludes aws-sdk v3 by default because it is included in the lambda runtime
@@ -104,10 +118,10 @@ export class Api extends Construct {
         initialPolicy: [
           new PolicyStatement({
             effect: Effect.ALLOW,
-            actions: ['bedrock:InvokeModel'],
-            resources: ['*']
-          })
-        ]
+            actions: ["bedrock:InvokeModel"],
+            resources: ["*"],
+          }),
+        ],
       }),
       retryAttempts: 0,
     });

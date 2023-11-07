@@ -12,6 +12,7 @@ export interface BlogCicdBedrockReleasesStackProps extends StackProps {
   oidcs: Record<string, string>;
   githubSecretArn: string;
   slackSecretArn: string;
+  slackChannel: string;
 }
 
 export class BlogCicdBedrockReleasesStack extends Stack {
@@ -22,7 +23,8 @@ export class BlogCicdBedrockReleasesStack extends Stack {
   ) {
     super(scope, id, props);
 
-    const { nextEnvs, oidcs, githubSecretArn, slackSecretArn } = props;
+    const { githubSecretArn, nextEnvs, oidcs, slackChannel, slackSecretArn } =
+      props;
 
     const table = new Table(this, "Table", {
       partitionKey: { name: "pk", type: AttributeType.STRING },
@@ -50,6 +52,7 @@ export class BlogCicdBedrockReleasesStack extends Stack {
       endpoints: webhookEndpoints,
       nextEnvs,
       oidcs,
+      slackChannel,
     });
 
     new NestedEventStack(this, "NestedEventStack", {
@@ -57,6 +60,7 @@ export class BlogCicdBedrockReleasesStack extends Stack {
       events: events({ table, slackSecret, githubSecret }),
       nextEnvs,
       oidcs,
+      slackChannel,
     });
   }
 }

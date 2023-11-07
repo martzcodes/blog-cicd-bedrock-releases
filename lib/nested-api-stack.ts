@@ -2,15 +2,16 @@ import { NestedStack, NestedStackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Api } from "./constructs/api";
 import { RestApi } from "aws-cdk-lib/aws-apigateway";
-import { Endpoint } from "./interfaces/Endpoint";
+import { EndpointLambda } from "./interfaces/EndpointLambda";
 import { IEventBus } from "aws-cdk-lib/aws-events";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 export interface NestedApiStackProps extends NestedStackProps {
   bus: IEventBus;
-  endpoints: Endpoint[];
+  endpoints: EndpointLambda[];
   nextEnvs: Record<string, string>;
   oidcs: Record<string, string>;
+  slackChannel: string;
 }
 
 export class NestedApiStack extends NestedStack {
@@ -24,6 +25,7 @@ export class NestedApiStack extends NestedStack {
       endpoints,
       nextEnvs,
       oidcs,
+      slackChannel,
     } = props;
 
     const { fns, restApi } = new Api(this, `Api`, {
@@ -32,6 +34,7 @@ export class NestedApiStack extends NestedStack {
       nextEnvs,
       oidcs,
       name: id,
+      slackChannel,
     });
     this.restApi = restApi;
     this.fns = { ...fns };

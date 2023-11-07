@@ -1,0 +1,49 @@
+{
+  "display_information": {
+      "name": "DEPLOYER_BOT"
+  },
+  "features": {
+      "bot_user": {
+          "display_name": "DEPLOYER_BOT",
+          "always_online": true
+      }
+  },
+  "oauth_config": {
+      "scopes": {
+          "user": [
+              "users.profile:read"
+          ],
+          "bot": [
+              "app_mentions:read",
+              "channels:history",
+              "chat:write",
+              "chat:write.customize",
+              "chat:write.public",
+              "emoji:read",
+              "groups:history",
+              "groups:read",
+              "groups:write",
+              "im:history",
+              "im:read",
+              "im:write",
+              "incoming-webhook",
+              "pins:read",
+              "pins:write",
+              "reactions:read",
+              "reactions:write",
+              "users:read",
+              "users.profile:read",
+              "commands"
+          ]
+      }
+  },
+  "settings": {
+      "interactivity": {
+          "is_enabled": true,
+          "request_url": "https://s1gxetee81.execute-api.us-east-1.amazonaws.com/prod/slack/interactive"
+      },
+      "org_deploy_enabled": false,
+      "socket_mode_enabled": false,
+      "token_rotation_enabled": false
+  }
+}

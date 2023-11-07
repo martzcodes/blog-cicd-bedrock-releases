@@ -1,5 +1,5 @@
 import { ITable } from "aws-cdk-lib/aws-dynamodb";
-import { EventBridgeEvent } from "../interfaces/EventBridgeEvent";
+import { EventBridgeLambda } from "../interfaces/EventBridgeLambda";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { EventDetailTypes } from "../lambda/common/event-detail-types";
 
@@ -11,15 +11,29 @@ export const events = ({
   table: ITable;
   slackSecret: ISecret;
   githubSecret: ISecret;
-}): EventBridgeEvent[] => [
+}): EventBridgeLambda[] => [
+  {
+    lambda: "event/process-commit",
+    eventPattern: {
+      detailType: [EventDetailTypes.COMMIT_EVENT],
+    },
+    putEvents: true,
+    dynamoWrite: {
+      BOT_TABLE: table,
+    },
+    bedrock: true,
+    secretRead: {
+      GITHUB_SECRET: githubSecret,
+    }
+  },
   {
     lambda: "event/slack-chat",
     eventPattern: {
       detailType: [EventDetailTypes.SLACK_CHAT],
     },
     putEvents: true,
-    secretsToRead: { SLACK_SECRET: slackSecret },
-    dynamosToWrite: { BOT_TABLE: table },
+    secretRead: { SLACK_SECRET: slackSecret },
+    dynamoWrite: { BOT_TABLE: table },
   },
   {
     lambda: "event/track-release",
@@ -27,8 +41,8 @@ export const events = ({
       detailType: [EventDetailTypes.TRACK_RELEASE],
     },
     putEvents: true,
-    dynamosToRead: { BOT_TABLE: table },
-    dynamosToWrite: { BOT_TABLE: table },
+    dynamoRead: { BOT_TABLE: table },
+    dynamoWrite: { BOT_TABLE: table },
     bedrock: true,
   },
   {
@@ -37,8 +51,8 @@ export const events = ({
       detailType: [EventDetailTypes.DEPLOY_WITH_GITHUB],
     },
     putEvents: true,
-    dynamosToRead: { BOT_TABLE: table },
-    dynamosToWrite: { BOT_TABLE: table },
-    secretsToRead: { GITHUB_SECRET: githubSecret },
+    dynamoRead: { BOT_TABLE: table },
+    dynamoWrite: { BOT_TABLE: table },
+    secretRead: { GITHUB_SECRET: githubSecret },
   },
 ];
