@@ -7,9 +7,9 @@ import { ddbDocClient } from "../common/dynamodb";
 import { sm } from "../common/secretsmanager";
 
 export const handler = async (
-  event: EventBridgeEvent<string, { data: CommitEvent }>
+  event: EventBridgeEvent<string, { data: { commitEvent: CommitEvent } }>
 ) => {
-  const body = event.detail.data;
+  const body = event.detail.data.commitEvent;
   console.log(JSON.stringify({ event }, null, 2));
   console.log(JSON.stringify({ body }, null, 2));
   const before = body.before;
