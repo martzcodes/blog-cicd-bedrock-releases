@@ -1,9 +1,9 @@
 import { EventBridgeEvent } from "aws-lambda";
-import { ChatPostMessageArguments, ChatUpdateArguments } from "@slack/web-api";
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../common/dynamodb";
 import { getSlackClient } from "../common/slackClient";
 import { SlackMessageEvent } from "../common/interfaces/SlackMessageEvent";
+import { ChatPostMessageArguments, ChatUpdateArguments } from "@slack/web-api";
+import { ddbDocClient } from "../common/dynamodb";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 export const handler = async (event: EventBridgeEvent<string, SlackMessageEvent>) => {
   console.log(JSON.stringify({ event }, null, 2));
@@ -21,22 +21,22 @@ export const handler = async (event: EventBridgeEvent<string, SlackMessageEvent>
       const { pk, sk, prop } = detail.data.storeMessageTs;
       // update the dynamodb item
       try {
-        await ddbDocClient.send(
-          new UpdateCommand({
-            TableName: process.env.BOT_TABLE,
-            Key: {
-              pk,
-              sk,
-            },
-            UpdateExpression: `set #prop = :prop`,
-            ExpressionAttributeNames: {
-              "#prop": prop,
-            },
-            ExpressionAttributeValues: {
-              ":prop": messagePost.ts,
-            },
-          })
-        );
+        const updateArgs = {
+          TableName: process.env.BOT_TABLE,
+          Key: {
+            pk,
+            sk,
+          },
+          UpdateExpression: `set #prop = :prop`,
+          ExpressionAttributeNames: {
+            "#prop": prop,
+          },
+          ExpressionAttributeValues: {
+            ":prop": messagePost.ts,
+          },
+        };
+        console.log(JSON.stringify({ updateArgs }, null, 2));
+        await ddbDocClient.send(new UpdateCommand(updateArgs));
       } catch (e) {
         console.log(e);
       }

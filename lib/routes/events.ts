@@ -2,6 +2,7 @@ import { ITable } from "aws-cdk-lib/aws-dynamodb";
 import { EventBridgeLambda } from "../interfaces/EventBridgeLambda";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { EventDetailTypes } from "../lambda/common/event-detail-types";
+import { EventSources } from "../lambda/common/event-sources";
 
 export const events = ({
   table,
@@ -24,7 +25,7 @@ export const events = ({
     bedrock: true,
     secretRead: {
       GITHUB_SECRET: githubSecret,
-    }
+    },
   },
   {
     lambda: "event/slack-chat",
@@ -54,5 +55,15 @@ export const events = ({
     dynamoRead: { BOT_TABLE: table },
     dynamoWrite: { BOT_TABLE: table },
     secretRead: { GITHUB_SECRET: githubSecret },
+  },
+  {
+    lambda: "event/env-diff",
+    eventPattern: {
+      source: [EventSources.DeployerBot],
+      detailType: [EventDetailTypes.ENV_DIFF],
+    },
+    putEvents: true,
+    dynamoRead: { BOT_TABLE: table },
+    bedrock: true,
   },
 ];

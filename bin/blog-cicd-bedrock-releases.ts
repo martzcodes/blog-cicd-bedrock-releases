@@ -17,6 +17,6 @@ new BlogCicdBedrockReleasesStack(app, "BlogCicdBedrockReleasesStack", {
   githubSecretArn: "arn:aws:secretsmanager:us-east-1:359317520455:secret:deployerbot/github-LM5TP2",
   nextEnvs,
   oidcs,
-  slackChannel: "C064YNZN940",
+  slackChannel: "C06J77S30R0",
   slackSecretArn: "arn:aws:secretsmanager:us-east-1:359317520455:secret:deployerbot/slack-bbPlpP",
 });

@@ -41,4 +41,10 @@ export const webhooks = ({
       BOT_TABLE: table,
     },
   },
+  {
+    path: "slack/action",
+    method: "POST",
+    lambda: "slack-action",
+    putEvents: true,
+  },
 ];

@@ -302,7 +302,7 @@ export const handler = async (
     detail: JSON.stringify({
       message: {
         channel: process.env.SLACK_CHANNEL,
-        ts: deploymentItem.Item?.slackTs,
+        thread_ts: deploymentItem.Item?.slackTs,
         blocks,
       },
     }),

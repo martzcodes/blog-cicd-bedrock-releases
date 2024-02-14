@@ -1,4 +1,4 @@
-import { Duration } from "aws-cdk-lib";
+import { CfnOutput, Duration } from "aws-cdk-lib";
 import {
   EndpointType,
   LambdaIntegration,
@@ -45,8 +45,9 @@ export class Api extends Construct {
       },
     });
 
-    const integrationRole = new Role(this, "integration-role", {
-      assumedBy: new ServicePrincipal("apigateway.amazonaws.com"),
+    new CfnOutput(this, `${name}ApiOutput`, {
+      value: this.restApi.url,
+      description: `The URL of the ${name} API`,
     });
 
     props.endpoints.forEach((endpoint) => {
