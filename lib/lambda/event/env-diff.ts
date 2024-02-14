@@ -1,5 +1,4 @@
 import { EventBridgeEvent } from "aws-lambda";
-import { ddbDocClient as ddb } from "../common/dynamodb";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -9,8 +8,9 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { GitHubCommit } from "../common/interfaces/GitHubCommit";
 import { putEvent } from "../common/put-events";
-import { eb } from "../common/eventbridge";
 import { EventDetailTypes } from "../common/event-detail-types";
+import { ddbDocClient } from "../common/dynamodb";
+import { eb } from "../common/eventbridge";
 
 export interface EnvRelease {
   pk: string;
@@ -29,18 +29,18 @@ export interface EnvRelease {
 }
 
 const queryCommitsBetweenCommits = async ({
-  ddb,
+  ddbDocClient,
   repo,
   startingCommitSha,
   endingCommitSha,
 }: {
-  ddb: DynamoDBDocumentClient;
+  ddbDocClient: DynamoDBDocumentClient;
   repo: string;
   startingCommitSha: string;
   endingCommitSha: string;
 }): Promise<GitHubCommit[]> => {
   const startingCommit = startingCommitSha
-    ? await ddb.send(
+    ? await ddbDocClient.send(
         new GetCommand({
           TableName: process.env.BOT_TABLE,
           Key: {
@@ -51,7 +51,7 @@ const queryCommitsBetweenCommits = async ({
       )
     : ({} as any);
   const endingCommit = endingCommitSha
-    ? await ddb.send(
+    ? await ddbDocClient.send(
         new GetCommand({
           TableName: process.env.BOT_TABLE,
           Key: {
@@ -66,7 +66,7 @@ const queryCommitsBetweenCommits = async ({
     if (!endingCommit.Item) {
       return [];
     }
-    const actualEndingCommit = await ddb.send(
+    const actualEndingCommit = await ddbDocClient.send(
       new GetCommand({
         TableName: process.env.BOT_TABLE,
         Key: {
@@ -101,7 +101,7 @@ const queryCommitsBetweenCommits = async ({
   try {
     let lastEvaluatedKey = undefined;
     do {
-      const res: QueryCommandOutput = await ddb.send(
+      const res: QueryCommandOutput = await ddbDocClient.send(
         new QueryCommand({
           ...params,
           ExclusiveStartKey: lastEvaluatedKey,
@@ -146,7 +146,7 @@ export const handler = async (
     lowerEnv = "test";
     higherEnv = "prod";
   }
-  const lowerEnvReleasesRes = await ddb.send(
+  const lowerEnvReleasesRes = await ddbDocClient.send(
     new GetCommand({
       TableName: process.env.BOT_TABLE,
       Key: {
@@ -156,7 +156,7 @@ export const handler = async (
     })
   );
   const lowerEnvReleases = lowerEnvReleasesRes.Item as EnvRelease;
-  const higherEnvReleasesRes = await ddb.send(
+  const higherEnvReleasesRes = await ddbDocClient.send(
     new GetCommand({
       TableName: process.env.BOT_TABLE,
       Key: {
@@ -166,8 +166,13 @@ export const handler = async (
     })
   );
   const higherEnvReleases = higherEnvReleasesRes.Item as EnvRelease;
-  const lowerEnvRepos = Object.keys(lowerEnvReleases.repos);
-  const higherEnvRepos = Object.keys(higherEnvReleases.repos);
+  const reposToExclude = ["mojo-browser-extension-instructions", "savvy-aasa", "savvy-dashboard", "savvy-logos"];
+  const lowerEnvRepos = Object.keys(lowerEnvReleases.repos).filter(
+    (repo) => !reposToExclude.includes(repo)
+  );
+  const higherEnvRepos = Object.keys(higherEnvReleases.repos).filter(
+    (repo) => !reposToExclude.includes(repo)
+  );
   console.log(JSON.stringify({ lowerEnvRepos, higherEnvRepos }, null, 2));
 
   const reposInSync = higherEnvRepos.reduce((p, c) => {
@@ -195,7 +200,7 @@ export const handler = async (
     const higherSha = higherEnvReleases.repos[repo]?.sha;
     try {
       const commits = await queryCommitsBetweenCommits({
-        ddb,
+        ddbDocClient,
         repo,
         startingCommitSha: higherSha,
         endingCommitSha: lowerSha,

@@ -1,4 +1,5 @@
 import { EventBridgeEvent } from "aws-lambda";
+import { ddbDocClient } from "../common/dynamodb";
 import { DeploymentEvent } from "../common/interfaces/DeploymentEvent";
 import {
   DynamoDBDocumentClient,
@@ -12,10 +13,9 @@ import {
 import { Release } from "../common/interfaces/Release";
 import { GitHubCommit } from "../common/interfaces/GitHubCommit";
 import { putEvent } from "../common/put-events";
-import { EventDetailTypes } from "../common/event-detail-types";
-import { ddbDocClient } from "../common/dynamodb";
 import { eb } from "../common/eventbridge";
-import { prepRelease, summarizeRelease } from "../common/bedrock";
+import { EventDetailTypes } from "../common/event-detail-types";
+import { summarizeRelease, prepRelease } from "../common/bedrock";
 import { nextEnvs } from "../common/nextEnvs";
 
 const archiveLatestRelease = async ({
@@ -197,7 +197,7 @@ export const handler = async (
     })
   );
   console.log(JSON.stringify({ deploymentItem }, null, 2));
-  const blocks = JSON.parse(deploymentItem.Item?.blocks || "[]");
+  const blocks: any[] = [];
   const archivedRelease = await archiveLatestRelease({
     ddbDocClient,
     deployment,
@@ -227,12 +227,8 @@ export const handler = async (
       text: `*${deployment.env.toUpperCase()} Release Summary*\n${summary}`,
     },
   };
-  // add the summary block below the divider
-  const dividerIndex = blocks.findIndex(
-    (block: any) => block.type === "divider"
-  );
   if (summary) {
-    blocks.splice(dividerIndex + 1, 0, summaryBlock);
+    blocks.push(summaryBlock);
   }
   console.log(JSON.stringify({ summary }, null, 2));
   await createLatestRelease({
@@ -258,6 +254,14 @@ export const handler = async (
       })
     );
     console.log(JSON.stringify({ releaseToPrep }, null, 2));
+    const commitBlock = {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*NEW Commits in ${deployment.env}: *\n${commits.map((c) => `- (<https://github.com/martzcodes/${archivedRelease.repo}/commit/${c.sha}|${c.sha?.slice(0, 7)}>) ${c.message.split('\n')[0]}...`).join("\n")}`,
+      },
+    };
+    blocks.push(commitBlock);
     if (releaseToPrep.Item) {
       const releaseToPrepCommits = await queryCommitsBetweenCommits({
         ddbDocClient,
@@ -274,7 +278,6 @@ export const handler = async (
       console.log(JSON.stringify({ prep }, null, 2));
       // get the latest deployment for the env
 
-      const summaryHeader = `*${deployment.env.toUpperCase()} Release Summary*\n`;
       const prepBlock = {
         type: "section",
         text: {
@@ -282,18 +285,15 @@ export const handler = async (
           text: `*Prep for ${nextEnv.toUpperCase()}*\n${prep}`,
         },
       };
-      // add the prep block below the summary block (or the divider if no summary)
-      const dividerIndex = blocks.findIndex(
-        (block: any) => block.type === "divider"
-      );
-      const summaryIndex = blocks.findIndex(
-        (block: any) =>
-          block.type === "section" &&
-          block.text?.text?.startsWith(summaryHeader)
-      );
-      const insertIndex =
-        summaryIndex > -1 ? summaryIndex + 1 : dividerIndex + 1;
-      blocks.splice(insertIndex, 0, prepBlock);
+      blocks.push(prepBlock);
+      const releaseDiffBlock = {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*<https://github.com/martzcodes/${archivedRelease.repo}/compare/${releaseToPrep.Item.sha}...${deployment.sha}|Diff for promoting to ${nextEnv.toUpperCase()}>*`,
+        },
+      };
+      blocks.push(releaseDiffBlock);
     }
   }
   await putEvent({
@@ -314,12 +314,12 @@ export const handler = async (
         pk,
         sk,
       },
-      UpdateExpression: `set #prop = :prop`,
+      UpdateExpression: `set #summary = :summary`,
       ExpressionAttributeNames: {
-        "#prop": "blocks",
+        "#summary": "summary",
       },
       ExpressionAttributeValues: {
-        ":prop": JSON.stringify(blocks),
+        ":summary": JSON.stringify(blocks),
       },
     })
   );
